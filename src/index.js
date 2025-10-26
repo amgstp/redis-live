@@ -44,26 +44,29 @@ async function pingInstance(url, password, username = 'default') {
   }
 }
 
-export async function scheduled(event, env, ctx) {
-  // Called by Cloudflare Cron Trigger
-  const urls = parseList(env.REDIS_URLS);
-  const passwords = parseList(env.REDIS_PASSWORDS);
-
-  const results = [];
-  for (let i = 0; i < urls.length; i++) {
-    const url = urls[i];
-    const password = passwords[i] || passwords[0] || '';
-    results.push({ url, result: await pingInstance(url, password) });
-  }
-
-  // Optionally keep lightweight logs in workers logs
-  results.forEach((r) => {
-    console.log('keepalive:', r.url, r.result && (r.result.status || r.result.error));
-  });
-  return results;
-}
+  // scheduled will be attached to the default export below
+  // (implemented as default.scheduled for Cloudflare Cron Triggers)
 
 export default {
+  async scheduled(controller, env, ctx) {
+    // Called by Cloudflare Cron Trigger
+    const urls = parseList(env.REDIS_URLS);
+    const passwords = parseList(env.REDIS_PASSWORDS);
+
+    const results = [];
+    for (let i = 0; i < urls.length; i++) {
+      const url = urls[i];
+      const password = passwords[i] || passwords[0] || '';
+      results.push({ url, result: await pingInstance(url, password) });
+    }
+
+    // Optionally keep lightweight logs in workers logs
+    results.forEach((r) => {
+      console.log('keepalive:', r.url, r.result && (r.result.status || r.result.error));
+    });
+    return results;
+  },
+
   async fetch(request, env, ctx) {
     // Manual trigger + health endpoint
     const urlObj = new URL(request.url);

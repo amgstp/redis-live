@@ -48,4 +48,52 @@ Notes & security
 - Never commit secrets. `wrangler secret put` stores secrets securely in Cloudflare and they do not appear in git.
 - Default cron in `wrangler.toml` runs daily at 00:00 UTC. Change the `crons` value if you want a different schedule (e.g., every 6 hours: `0 */6 * * *`).
 
-If you want, I can now set the secret from the `rediss://` string you provided and publish the worker for you. After deploy you can watch the first execution in the Cloudflare dashboard and the Upstash console for write timestamps.
+Cron implementation (how it works)
+
+- The worker implements a `scheduled` handler and registers Cron Triggers via the Wrangler configuration. Cloudflare will call the `scheduled` handler on the configured cron schedule (UTC).
+- Key points from the code:
+  - `src/index.js` exports a default object with two handlers: `scheduled(controller, env, ctx)` and `fetch(request, env, ctx)`.
+  - The `scheduled` handler reads `env.REDIS_URLS` and `env.REDIS_PASSWORDS`, then for each URL issues a POST to the Upstash REST endpoint with the Redis command as a JSON array, for example:
+
+    ["SET", "keepalive:<timestamp>", "1", "EX", "86400"]
+
+  - Authentication: the worker first attempts `Authorization: Bearer <token>` (Upstash REST token). If that returns 401, it falls back to Basic Auth (`Authorization: Basic base64(default:<token>)`). This makes the worker robust across Upstash credential styles.
+  - Cron schedule is declared in `wrangler.toml` under the `[triggers]` table, for example:
+
+    [triggers]
+    crons = ["0 0 * * *"]
+
+    Cloudflare requires the `scheduled` handler and that triggers be declared under `[triggers]` for Wrangler-managed projects (see Cloudflare docs).
+
+How to add more Redis instances
+
+- Edit `wrangler.toml` and add more endpoints to `REDIS_URLS` (comma or newline separated), for example:
+
+  ```toml
+  [vars]
+  REDIS_URLS = "https://a.upstash.io,https://b.upstash.io"
+  [triggers]
+  crons = ["0 0 * * *"]
+  ```
+
+- Then set `REDIS_PASSWORDS` secret with one token per line in the same order (or a single token will be reused):
+
+  ```bash
+  # interactive
+  wrangler secret put REDIS_PASSWORDS
+
+  # or non-interactive (example with two tokens)
+  printf "token-for-a\ntoken-for-b" | wrangler secret put REDIS_PASSWORDS
+  ```
+
+Verification & logs
+
+- You can manually trigger an immediate run with the `/run` endpoint:
+
+  ```bash
+  curl -s https://<your-worker-domain>/run | jq
+  ```
+
+- Cron executions and history appear in the Cloudflare dashboard (Workers -> Settings -> Triggers -> Cron Events) and in Workers Logs.
+
+If you want, I can push this repository to GitHub for you (I will run `git add/commit/push` from the workspace). After pushing I will report the remote status and the commit id.

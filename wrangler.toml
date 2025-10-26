@@ -9,5 +9,7 @@ main = "src/index.js"
 [vars]
 REDIS_URLS = "https://adapted-hawk-11134.upstash.io"
 
+[triggers]
 # Cron: daily at 00:00 UTC. Change as needed.
+# See Cloudflare docs: cron triggers live under the [triggers] table.
 crons = ["0 0 * * *"]
