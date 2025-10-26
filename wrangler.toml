@@ -1,0 +1,13 @@
+name = "redis-keepalive"
+compatibility_date = "2025-10-26"
+
+# Entry point for the Worker script
+main = "src/index.js"
+
+# REDIS_URLS should be a newline- or comma-separated list of Upstash HTTPS endpoints, e.g.
+# https://adapted-hawk-11134.upstash.io
+[vars]
+REDIS_URLS = "https://adapted-hawk-11134.upstash.io"
+
+# Cron: daily at 00:00 UTC. Change as needed.
+crons = ["0 0 * * *"]
